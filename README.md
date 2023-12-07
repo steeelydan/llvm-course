@@ -12,3 +12,10 @@ Dmitry Soshnikov: Programming Language with LLVM (https://www.udemy.com/course/p
 -   Generate native assembly: `clang++ -S hello.ll`
 -   LLVM interpreter: `lli hello.ll`
 -   Minimal LLVM program: `minimum.ll`
+
+## Eva
+
+-   Compile:
+    ```bash
+    clang++ -o eva-llvm `llvm-config --cxxflags --ldflags --system-libs --libs core` eva-llvm.cpp
+    ```
