@@ -58,7 +58,7 @@ private:
 
     llvm::Value *gen()
     {
-        return builder->getInt32(42);
+        return builder->CreateGlobalStringPtr("Hello, world!\n");
     }
 
     /**

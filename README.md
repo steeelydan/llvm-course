@@ -19,3 +19,11 @@ Dmitry Soshnikov: Programming Language with LLVM (https://www.udemy.com/course/p
     ```bash
     clang++ -o eva-llvm `llvm-config --cxxflags --ldflags --system-libs --libs core` eva-llvm.cpp
     ```
+
+## LLVM Characteristics
+
+### Strings
+
+-   Constant
+-   Arrays of characters (bytes)
+-   Byte-aligned
