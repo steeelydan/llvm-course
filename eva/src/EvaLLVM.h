@@ -13,6 +13,7 @@ public:
     EvaLLVM()
     {
         moduleInit();
+        setupExternalFunctions();
     }
 
     void exec(const std::string &program)
@@ -49,16 +50,31 @@ private:
     {
         fn = createFunction("main", llvm::FunctionType::get(builder->getInt32Ty(), false));
 
-        auto result = gen();
+        gen();
 
-        auto i32Result = builder->CreateIntCast(result, builder->getInt32Ty(), true);
-
-        builder->CreateRet(i32Result);
+        builder->CreateRet(builder->getInt32(0));
     }
 
     llvm::Value *gen()
     {
-        return builder->CreateGlobalStringPtr("Hello, world!\n");
+        auto str = builder->CreateGlobalStringPtr("Hello, world!\n");
+
+        auto printFn = module->getFunction("printf");
+
+        std::vector<llvm::Value *> args{str};
+
+        return builder->CreateCall(printFn, args);
+    }
+
+    /**
+     *  External functions from libc++
+     */
+    void setupExternalFunctions()
+    {
+        auto bytePtrTy = builder->getInt8Ty()->getPointerTo();
+
+        module->getOrInsertFunction("printf",
+                                    llvm::FunctionType::get(/* return type */ builder->getInt32Ty(), /* format arg */ bytePtrTy, /* vararg */ true));
     }
 
     /**
@@ -110,7 +126,7 @@ private:
         return llvm::BasicBlock::Create(*ctx, name, fn);
     }
 
-    llvm::Function* fn;
+    llvm::Function *fn;
 
     /**
      * Owns & manages core 'global' data of LLVM's core infrastructure,

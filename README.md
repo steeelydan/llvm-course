@@ -27,3 +27,9 @@ Dmitry Soshnikov: Programming Language with LLVM (https://www.udemy.com/course/p
 -   Constant
 -   Arrays of characters (bytes)
 -   Byte-aligned
+
+### Functions
+
+-   We included standard & core libraries with a compiler flag
+    -   ...so we can use std c++ functions in our language
+    -   ...so they only have to be declared
