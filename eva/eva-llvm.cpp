@@ -4,7 +4,7 @@ int main(int argc, char const *argv[])
 {
     std::string program = R"(
 
-        42
+        (printf "\nValue: %d\n" 43)
 
     )";
 

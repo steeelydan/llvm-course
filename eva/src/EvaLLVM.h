@@ -1,16 +1,21 @@
+#ifndef EvaLLVM_h
+#define EvaLLVM_h
+
 #include <string>
+#include <regex>
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Verifier.h"
+#include "./parser/EvaParser.h"
 
-#ifndef EvaLLVM_h
-#define EvaLLVM_h
+using syntax::EvaParser;
 
 class EvaLLVM
 {
 public:
     EvaLLVM()
+        : parser(std::make_unique<EvaParser>())
     {
         moduleInit();
         setupExternalFunctions();
@@ -18,16 +23,12 @@ public:
 
     void exec(const std::string &program)
     {
-        // 1. Parse the program
-        // auto ast = parser->parser(program);
+        auto ast = parser->parse(program);
 
-        // 2. Compile to LLVM IR:
-        compile();
+        compile(ast);
 
-        // Print generated code
         module->print(llvm::outs(), nullptr);
 
-        // 3. Save module IR to file:
         saveModuleToFile("./out.ll");
     }
 
@@ -39,6 +40,8 @@ private:
         builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
     }
 
+    std::unique_ptr<EvaParser> parser;
+
     void saveModuleToFile(const std::string &fileName)
     {
         std::error_code errorCode;
@@ -46,24 +49,59 @@ private:
         module->print(outLL, nullptr);
     }
 
-    void compile()
+    void compile(const Exp &ast)
     {
         fn = createFunction("main", llvm::FunctionType::get(builder->getInt32Ty(), false));
 
-        gen();
+        gen(ast);
 
         builder->CreateRet(builder->getInt32(0));
     }
 
-    llvm::Value *gen()
+    llvm::Value *gen(const Exp &exp)
     {
-        auto str = builder->CreateGlobalStringPtr("Hello, world!\n");
 
-        auto printFn = module->getFunction("printf");
+        switch (exp.type)
+        {
+        case ExpType::NUMBER:
+            return builder->getInt32(exp.number);
 
-        std::vector<llvm::Value *> args{str};
+        case ExpType::STRING:
+        {
+            auto re = std::regex("\\\\n");
+            auto str = std::regex_replace(exp.string, re, "\n");
 
-        return builder->CreateCall(printFn, args);
+            return builder->CreateGlobalStringPtr(str);
+        }
+
+        case ExpType::SYMBOL:
+            // TODO
+            return builder->getInt32(0);
+
+        case ExpType::LIST:
+            auto tag = exp.list[0];
+
+            if (tag.type == ExpType::SYMBOL)
+            {
+                auto op = tag.string;
+
+                if (op == "printf")
+                {
+                    auto printFn = module->getFunction("printf");
+                    std::vector<llvm::Value *> args{};
+
+                    for (auto i = 1; i < exp.list.size(); i++)
+                    {
+                        args.push_back(gen(exp.list[i]));
+                    }
+
+                    return builder->CreateCall(printFn, args);
+                }
+            }
+        }
+
+        // Unreachable
+        builder->getInt32(0);
     }
 
     /**
