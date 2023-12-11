@@ -89,7 +89,16 @@ private:
             {
                 auto op = tag.string;
 
-                if (op == "printf")
+                // (var x (+ y 10))
+                if (op == "var")
+                {
+                    auto varName = exp.list[1].string;
+                    auto init = gen(exp.list[2]);
+
+                    return createGlobalVar(varName, (llvm::Constant *)init);
+                }
+                // (printf "Value: %d" 42)
+                else if (op == "printf")
                 {
                     auto printFn = module->getFunction("printf");
                     std::vector<llvm::Value *> args{};
@@ -117,6 +126,17 @@ private:
 
         module->getOrInsertFunction("printf",
                                     llvm::FunctionType::get(/* return type */ builder->getInt32Ty(), /* format arg */ bytePtrTy, /* vararg */ true));
+    }
+
+    llvm::GlobalVariable *createGlobalVar(const std::string &name, llvm::Constant *init)
+    {
+        module->getOrInsertGlobal(name, init->getType());
+        auto variable = module->getNamedGlobal(name);
+        variable->setAlignment(llvm::MaybeAlign(4));
+        variable->setConstant(false);
+        variable->setInitializer(init);
+
+        return variable;
     }
 
     /**
