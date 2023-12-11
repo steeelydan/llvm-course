@@ -75,8 +75,12 @@ private:
         }
 
         case ExpType::SYMBOL:
+            // Boolean
+            if (exp.string == "true" || exp.string == "false")
+            {
+                return builder->getInt1(exp.string == "true" ? true : false);
+            }
             // TODO
-            return builder->getInt32(0);
 
         case ExpType::LIST:
             auto tag = exp.list[0];
