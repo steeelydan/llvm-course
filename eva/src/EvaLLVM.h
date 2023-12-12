@@ -191,6 +191,48 @@ private:
                 {
                     GEN_BINARY_OP(CreateICmpULE, "tmpcmp");
                 }
+                // (if <cond> <then> <else>)
+                else if (op == "if")
+                {
+                    auto cond = generate(exp.list[1], env);
+
+                    // Appended right away
+                    auto thenBlock = createBB("then", fn);
+
+                    // Else & if-end block: appended later to
+                    // handle nested if expressions
+                    auto elseBlock = createBB("else");
+                    auto ifEndBlock = createBB("ifend");
+
+                    builder->CreateCondBr(cond, thenBlock, elseBlock);
+
+                    builder->SetInsertPoint(thenBlock);
+                    auto thenResult = generate(exp.list[2], env);
+                    builder->CreateBr(ifEndBlock);
+                    // Restore the block to handle nested if-expressions
+                    // This is needed for phi instruction
+                    thenBlock = builder->GetInsertBlock();
+
+                    // Append block to the function now
+                    fn->getBasicBlockList().push_back(elseBlock);
+                    builder->SetInsertPoint(elseBlock);
+                    auto elseResult = generate(exp.list[3], env);
+                    builder->CreateBr(ifEndBlock);
+
+                    // Restore the block for phi instruction:
+                    elseBlock = builder->GetInsertBlock();
+
+                    fn->getBasicBlockList().push_back(ifEndBlock);
+                    builder->SetInsertPoint(ifEndBlock);
+
+                    // Result of the if expression is phi
+                    auto phi = builder->CreatePHI(thenResult->getType(), 2, "tmpif");
+
+                    phi->addIncoming(thenResult, thenBlock);
+                    phi->addIncoming(elseResult, elseBlock);
+
+                    return phi;
+                }
                 // Variable declaration & init: (var x (+ y 10))
                 // Typed: (var (x number) 42)
                 else if (op == "var")
@@ -212,7 +254,9 @@ private:
                     auto varName = exp.list[1].string;
                     auto varBinding = env->lookup(varName);
 
-                    return builder->CreateStore(value, varBinding);
+                    builder->CreateStore(value, varBinding);
+
+                    return value;
                 }
                 // Blocks: (begin <expression>)
                 else if (op == "begin")
@@ -352,6 +396,9 @@ private:
         return llvm::BasicBlock::Create(*ctx, name, fn);
     }
 
+    /**
+     * Currently compiling function
+     */
     llvm::Function *fn;
 
     /**
