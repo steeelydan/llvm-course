@@ -53,6 +53,9 @@ private:
     {
         fn = createFunction("main", llvm::FunctionType::get(builder->getInt32Ty(), false));
 
+        // TODO Remove
+        createGlobalVar("VERSION", builder->getInt32(42));
+
         gen(ast);
 
         builder->CreateRet(builder->getInt32(0));
@@ -79,6 +82,12 @@ private:
             if (exp.string == "true" || exp.string == "false")
             {
                 return builder->getInt1(exp.string == "true" ? true : false);
+            } else {
+                // TODO: Local variables
+
+                // Global variables
+                // TODO: Get actual current value instead of initialized value
+                return module->getNamedGlobal(exp.string)->getInitializer();
             }
             // TODO
 
@@ -95,7 +104,7 @@ private:
                     auto varName = exp.list[1].string;
                     auto init = gen(exp.list[2]);
 
-                    return createGlobalVar(varName, (llvm::Constant *)init);
+                    return createGlobalVar(varName, (llvm::Constant *)init)->getInitializer();
                 }
                 // (printf "Value: %d" 42)
                 else if (op == "printf")

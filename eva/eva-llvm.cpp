@@ -6,8 +6,9 @@ int main(int argc, char const *argv[])
 
         // (printf "\nValue: %d\n" 43)
         // (printf "True: %d\n\n" true)
-        (var VERSION 42)
+        // (var VERSION 42)
         // (printf "Version: %d\n\n" VERSION)
+        (printf "Version: %d\n\n" (var VERSION 43))
 
     )";
 
