@@ -18,6 +18,10 @@ int main(int argc, char const *argv[])
 
         (printf "x: %d\n\n" x)
 
+        (set x 100)
+
+        (printf "x: %d\n\n" x)
+
     )";
 
     EvaLLVM vm;

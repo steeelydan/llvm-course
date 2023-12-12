@@ -155,6 +155,13 @@ private:
 
                     // Store on stack
                     return builder->CreateStore(init, varBinding);
+                } else if (op == "set") {
+                    auto value = generate(exp.list[2], env);
+
+                    auto varName = exp.list[1].string;
+                    auto varBinding = env->lookup(varName);
+
+                    return builder->CreateStore(value, varBinding);
                 }
                 // Blocks: (begin <expression>)
                 else if (op == "begin")
