@@ -44,3 +44,11 @@ Dmitry Soshnikov: Programming Language with LLVM (https://www.udemy.com/course/p
         %x1 = alloca i32, align 4
         store i8* getelementptr inbounds ([6 x i8], [6 x i8]* @0, i32 0, i32 0), i32* %x1, align 8
         ```
+
+### Optimization
+
+-   Arithmetic operations: Builder preevaluates e.g. `(var x (+ 32 15))`, resulting in:
+    ```
+    %x = alloca i32, align 4
+    store i32 47, i32* %x, align 4
+    ```

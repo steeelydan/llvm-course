@@ -13,6 +13,15 @@
 using syntax::EvaParser;
 using Env = std::shared_ptr<Environment>;
 
+#define GEN_BINARY_OP(Op, varName)             \
+    do                                         \
+    {                                          \
+        auto op1 = generate(exp.list[1], env); \
+        auto op2 = generate(exp.list[2], env); \
+                                               \
+        return builder->Op(op1, op2, varName); \
+    } while (false) // Not executed, but generates scope
+
 class EvaLLVM
 {
 public:
@@ -142,9 +151,25 @@ private:
             {
                 auto op = tag.string;
 
+                if (op == "+")
+                {
+                    GEN_BINARY_OP(CreateAdd, "tmpadd");
+                }
+                else if (op == "-")
+                {
+                    GEN_BINARY_OP(CreateSub, "tmpsub");
+                }
+                else if (op == "*")
+                {
+                    GEN_BINARY_OP(CreateMul, "tmpmul");
+                }
+                else if (op == "/")
+                {
+                    GEN_BINARY_OP(CreateSDiv, "tmpdiv");
+                }
                 // Variable declaration & init: (var x (+ y 10))
                 // Typed: (var (x number) 42)
-                if (op == "var")
+                else if (op == "var")
                 {
                     auto varNameDecl = exp.list[1];
                     auto init = generate(exp.list[2], env);
@@ -155,7 +180,9 @@ private:
 
                     // Store on stack
                     return builder->CreateStore(init, varBinding);
-                } else if (op == "set") {
+                }
+                else if (op == "set")
+                {
                     auto value = generate(exp.list[2], env);
 
                     auto varName = exp.list[1].string;
