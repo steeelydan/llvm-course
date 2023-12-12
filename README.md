@@ -33,3 +33,14 @@ Dmitry Soshnikov: Programming Language with LLVM (https://www.udemy.com/course/p
 -   We included standard & core libraries with a compiler flag
     -   ...so we can use std c++ functions in our language
     -   ...so they only have to be declared
+
+### Local variables
+
+-   Variable 'versioning' in IR: https://en.wikipedia.org/wiki/Static_single-assignment_form
+    -   Example:
+        ```
+        %x = alloca i32, align 4
+        store i32 42, i32* %x, align 4
+        %x1 = alloca i32, align 4
+        store i8* getelementptr inbounds ([6 x i8], [6 x i8]* @0, i32 0, i32 0), i32* %x1, align 8
+        ```

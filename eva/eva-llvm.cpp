@@ -10,13 +10,13 @@ int main(int argc, char const *argv[])
         // (printf "Version: %d\n\n" VERSION)
         // (printf "Version: %d\n\n" (var VERSION 43))
 
-        // (var VERSION 42)
+        (var x 42)
 
-        // (begin
-        //     (var VERSION "Hello")
-        //     (printf "Version: %s\n\n" VERSION))
+        (begin
+            (var (x string) "Hello")
+            (printf "x: %s\n\n" x))
 
-        (printf "Version: %d\n\n" VERSION)
+        (printf "x: %d\n\n" x)
 
     )";
 

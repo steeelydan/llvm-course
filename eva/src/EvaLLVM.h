@@ -41,6 +41,7 @@ private:
         ctx = std::make_unique<llvm::LLVMContext>();
         module = std::make_unique<llvm::Module>("EvaLLVM", *ctx);
         builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
+        varsBuilder = std::make_unique<llvm::IRBuilder<>>(*ctx);
     }
 
     std::unique_ptr<EvaParser> parser;
@@ -116,7 +117,12 @@ private:
                 auto varName = exp.string;
                 auto value = env->lookup(varName);
 
-                if (auto globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value))
+                if (auto localVar = llvm::dyn_cast<llvm::AllocaInst>(value))
+                {
+                    // Load local var onto stack
+                    return builder->CreateLoad(localVar->getAllocatedType(), localVar, varName.c_str());
+                }
+                else if (auto globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value))
                 {
                     // Load global variable onto stack
                     // LLVM IR: looks like
@@ -137,22 +143,29 @@ private:
                 auto op = tag.string;
 
                 // Variable declaration & init: (var x (+ y 10))
+                // Typed: (var (x number) 42)
                 if (op == "var")
                 {
-                    auto varName = exp.list[1].string;
+                    auto varNameDecl = exp.list[1];
                     auto init = generate(exp.list[2], env);
 
-                    return createGlobalVar(varName, (llvm::Constant *)init)->getInitializer();
+                    auto varName = extractVarName(varNameDecl);
+                    auto varType = extractVarType(varNameDecl);
+                    auto varBinding = allocVar(varName, varType, env);
+
+                    // Store on stack
+                    return builder->CreateStore(init, varBinding);
                 }
                 // Blocks: (begin <expression>)
                 else if (op == "begin")
                 {
+                    auto blockEnv = std::make_shared<Environment>(std::map<std::string, llvm::Value *>{}, env);
+
                     llvm::Value *blockResult;
 
                     for (auto i = 1; i < exp.list.size(); i++)
                     {
-                        // Todo: local env for blocks
-                        blockResult = generate(exp.list[i], env);
+                        blockResult = generate(exp.list[i], blockEnv);
                     }
 
                     return blockResult;
@@ -228,6 +241,48 @@ private:
         builder->SetInsertPoint(entry);
     }
 
+    std::string extractVarName(const Exp &exp)
+    {
+        return exp.type == ExpType::LIST ? exp.list[0].string : exp.string;
+    }
+
+    // Default: i32
+    llvm::Type *extractVarType(const Exp &exp)
+    {
+        return exp.type == ExpType::LIST ? getTypeFromString(exp.list[1].string) : builder->getInt32Ty();
+    }
+
+    llvm::Type *getTypeFromString(const std::string &type_)
+    {
+        if (type_ == "number")
+        {
+            return builder->getInt32Ty();
+        }
+
+        if (type_ == "string")
+        {
+            // aka char*
+            return builder->getInt8Ty()->getPointerTo();
+        }
+
+        // Default
+        return builder->getInt32Ty();
+    }
+
+    llvm::Value *allocVar(const std::string &name, llvm::Type *type_, Env env)
+    {
+        // Explicitly put stuff at the entry point of
+        // our current function, regardless of where
+        // the main builder is
+        varsBuilder->SetInsertPoint(&fn->getEntryBlock());
+
+        auto varAlloc = varsBuilder->CreateAlloca(type_, 0, name.c_str());
+
+        env->define(name, varAlloc);
+
+        return varAlloc;
+    }
+
     /**
      * If `fn` is passed, block is automatically appended to
      * the parent function.
@@ -260,6 +315,13 @@ private:
      * constant references to global variables in the module
      */
     std::unique_ptr<llvm::Module> module;
+
+    /**
+     * Extra builder for var declaration.
+     * Always prepends to the beginning of the function
+     * entry block.
+     */
+    std::unique_ptr<llvm::IRBuilder<>> varsBuilder;
 
     /**
      * Provides uniform API for creating instructions and inserting them
