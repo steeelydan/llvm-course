@@ -167,6 +167,30 @@ private:
                 {
                     GEN_BINARY_OP(CreateSDiv, "tmpdiv");
                 }
+                else if (op == ">")
+                {
+                    GEN_BINARY_OP(CreateICmpUGT, "tmpcmp");
+                }
+                else if (op == "<")
+                {
+                    GEN_BINARY_OP(CreateICmpULT, "tmpcmp");
+                }
+                else if (op == "==")
+                {
+                    GEN_BINARY_OP(CreateICmpEQ, "tmpcmp");
+                }
+                else if (op == "!=")
+                {
+                    GEN_BINARY_OP(CreateICmpNE, "tmpcmp");
+                }
+                else if (op == ">=")
+                {
+                    GEN_BINARY_OP(CreateICmpUGE, "tmpcmp");
+                }
+                else if (op == "<=")
+                {
+                    GEN_BINARY_OP(CreateICmpULE, "tmpcmp");
+                }
                 // Variable declaration & init: (var x (+ y 10))
                 // Typed: (var (x number) 42)
                 else if (op == "var")

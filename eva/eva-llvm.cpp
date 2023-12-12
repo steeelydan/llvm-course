@@ -8,11 +8,11 @@ int main(int argc, char const *argv[])
 
         // (printf "True: %d\n\n" true)
 
-        (var VERSION 42)
+        // (var VERSION 42)
         // (printf "Version: %d\n\n" VERSION)
         // (printf "Version: %d\n\n" (var VERSION 43))
 
-        // (var x 42)
+        (var x 42)
         // (begin
         //     (var (x string) "Hello")
         //     (printf "x: %s\n\n" x))
@@ -25,9 +25,12 @@ int main(int argc, char const *argv[])
         // (printf "X: %d\n" x)
 
         // See addition in IR
-        (var z 32)
-        (var x (+ z 11))
-        (printf "X: %d\n" x)
+        // (var z 32)
+        // (var x (+ z 11))
+        // (printf "X: %d\n" x)
+
+        (printf "Is X == 42?: %d\n" (== x 42))
+        (printf "Is X > 42?: %d\n" (> x 42))
 
         // (if (== x 42)
         //     (set x 100)
