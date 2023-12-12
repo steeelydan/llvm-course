@@ -8,8 +8,10 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Verifier.h"
 #include "./parser/EvaParser.h"
+#include "./Environment.h"
 
 using syntax::EvaParser;
+using Env = std::shared_ptr<Environment>;
 
 class EvaLLVM
 {
@@ -19,11 +21,12 @@ public:
     {
         moduleInit();
         setupExternalFunctions();
+        setupGlobalEnvironment();
     }
 
     void exec(const std::string &program)
     {
-        auto ast = parser->parse(program);
+        auto ast = parser->parse("(begin " + program + ")");
 
         compile(ast);
 
@@ -42,6 +45,34 @@ private:
 
     std::unique_ptr<EvaParser> parser;
 
+    Env GlobalEnv;
+
+    void setupGlobalEnvironment()
+    {
+        std::map<std::string, llvm::Value *> globalObject{
+            {"VERSION", builder->getInt32(44)}};
+
+        std::map<std::string, llvm::Value *> globalRec{};
+
+        for (auto &entry : globalObject)
+        {
+            globalRec[entry.first] = createGlobalVar(entry.first, (llvm::Constant *)entry.second);
+        }
+
+        GlobalEnv = std::make_shared<Environment>(globalRec, nullptr);
+    }
+
+    /**
+     *  External functions from libc++
+     */
+    void setupExternalFunctions()
+    {
+        auto bytePtrTy = builder->getInt8Ty()->getPointerTo();
+
+        module->getOrInsertFunction("printf",
+                                    llvm::FunctionType::get(/* return type */ builder->getInt32Ty(), /* format arg */ bytePtrTy, /* vararg */ true));
+    }
+
     void saveModuleToFile(const std::string &fileName)
     {
         std::error_code errorCode;
@@ -51,17 +82,14 @@ private:
 
     void compile(const Exp &ast)
     {
-        fn = createFunction("main", llvm::FunctionType::get(builder->getInt32Ty(), false));
+        fn = createFunction("main", llvm::FunctionType::get(builder->getInt32Ty(), false), GlobalEnv);
 
-        // TODO Remove
-        createGlobalVar("VERSION", builder->getInt32(42));
-
-        gen(ast);
+        generate(ast, GlobalEnv);
 
         builder->CreateRet(builder->getInt32(0));
     }
 
-    llvm::Value *gen(const Exp &exp)
+    llvm::Value *generate(const Exp &exp, Env env)
     {
 
         switch (exp.type)
@@ -82,14 +110,24 @@ private:
             if (exp.string == "true" || exp.string == "false")
             {
                 return builder->getInt1(exp.string == "true" ? true : false);
-            } else {
-                // TODO: Local variables
-
-                // Global variables
-                // TODO: Get actual current value instead of initialized value
-                return module->getNamedGlobal(exp.string)->getInitializer();
             }
-            // TODO
+            else
+            {
+                auto varName = exp.string;
+                auto value = env->lookup(varName);
+
+                if (auto globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value))
+                {
+                    // Load global variable onto stack
+                    // LLVM IR: looks like
+                    // @VERSION = global i32 43, align 4
+                    // ...
+                    // %VERSION = load i32, i32* @VERSION, align 4
+                    return builder->CreateLoad(globalVar->getInitializer()->getType(), globalVar, varName.c_str());
+                }
+
+                // Todo local var
+            }
 
         case ExpType::LIST:
             auto tag = exp.list[0];
@@ -98,15 +136,28 @@ private:
             {
                 auto op = tag.string;
 
-                // (var x (+ y 10))
+                // Variable declaration & init: (var x (+ y 10))
                 if (op == "var")
                 {
                     auto varName = exp.list[1].string;
-                    auto init = gen(exp.list[2]);
+                    auto init = generate(exp.list[2], env);
 
                     return createGlobalVar(varName, (llvm::Constant *)init)->getInitializer();
                 }
-                // (printf "Value: %d" 42)
+                // Blocks: (begin <expression>)
+                else if (op == "begin")
+                {
+                    llvm::Value *blockResult;
+
+                    for (auto i = 1; i < exp.list.size(); i++)
+                    {
+                        // Todo: local env for blocks
+                        blockResult = generate(exp.list[i], env);
+                    }
+
+                    return blockResult;
+                }
+                // printf(): (printf "Value: %d" 42)
                 else if (op == "printf")
                 {
                     auto printFn = module->getFunction("printf");
@@ -114,7 +165,7 @@ private:
 
                     for (auto i = 1; i < exp.list.size(); i++)
                     {
-                        args.push_back(gen(exp.list[i]));
+                        args.push_back(generate(exp.list[i], env));
                     }
 
                     return builder->CreateCall(printFn, args);
@@ -124,17 +175,6 @@ private:
 
         // Unreachable
         builder->getInt32(0);
-    }
-
-    /**
-     *  External functions from libc++
-     */
-    void setupExternalFunctions()
-    {
-        auto bytePtrTy = builder->getInt8Ty()->getPointerTo();
-
-        module->getOrInsertFunction("printf",
-                                    llvm::FunctionType::get(/* return type */ builder->getInt32Ty(), /* format arg */ bytePtrTy, /* vararg */ true));
     }
 
     llvm::GlobalVariable *createGlobalVar(const std::string &name, llvm::Constant *init)
@@ -155,14 +195,14 @@ private:
      *     - Optimization takes place here
      * - Control flow blocks: Branch instructions: Conditionals, jumps
      */
-    llvm::Function *createFunction(const std::string &fnName, llvm::FunctionType *fnType)
+    llvm::Function *createFunction(const std::string &fnName, llvm::FunctionType *fnType, Env env)
     {
         // Function prototype might already be defined
         auto fn = module->getFunction(fnName);
 
         if (fn == nullptr)
         {
-            fn = createFunctionProto(fnName, fnType);
+            fn = createFunctionProto(fnName, fnType, env);
         }
 
         createFunctionBlock(fn);
@@ -170,11 +210,13 @@ private:
         return fn;
     }
 
-    llvm::Function *createFunctionProto(const std::string &fnName, llvm::FunctionType *fnType)
+    llvm::Function *createFunctionProto(const std::string &fnName, llvm::FunctionType *fnType, Env env)
     {
         auto fn = llvm::Function::Create(fnType, llvm::Function::ExternalLinkage, fnName, *module);
 
         verifyFunction(*fn);
+
+        env->define(fnName, fn);
 
         return fn;
     }
