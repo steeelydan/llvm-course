@@ -12,7 +12,7 @@ int main(int argc, char const *argv[])
         // (printf "Version: %d\n\n" VERSION)
         // (printf "Version: %d\n\n" (var VERSION 43))
 
-        (var x 39)
+        // (var x 39)
         // (begin
         //     (var (x string) "Hello")
         //     (printf "x: %s\n\n" x))
@@ -38,13 +38,22 @@ int main(int argc, char const *argv[])
 
         // (printf "X: %d\n" x)
 
-        (if (!= x 42)
-            (if (> x 42)
-                (set x 300)
-                (set x 200))
-            (set x 100))
+        // (if (!= x 42)
+        //     (if (> x 42)
+        //         (set x 300)
+        //         (set x 200))
+        //     (set x 100))
 
-        (printf "X: %d\n" x)
+        // (printf "X: %d\n" x)
+
+        (var x 10)
+
+        (while (> x 0)
+            (begin
+                (set x (- x 1))
+                (printf "%d " x)
+                )
+            )
     )";
 
     EvaLLVM vm;

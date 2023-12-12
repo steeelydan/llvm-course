@@ -233,6 +233,29 @@ private:
 
                     return phi;
                 }
+                else if (op == "while")
+                {
+                    auto condBlock = createBB("cond", fn);
+                    builder->CreateBr(condBlock);
+
+                    auto bodyBlock = createBB("body");
+                    auto loopEndBlock = createBB("loopend");
+
+                    builder->SetInsertPoint(condBlock);
+                    auto cond = generate(exp.list[1], env);
+
+                    builder->CreateCondBr(cond, bodyBlock, loopEndBlock);
+
+                    fn->getBasicBlockList().push_back(bodyBlock);
+                    builder->SetInsertPoint(bodyBlock);
+                    generate(exp.list[2], env);
+                    builder->CreateBr(condBlock);
+
+                    fn->getBasicBlockList().push_back(loopEndBlock);
+                    builder->SetInsertPoint(loopEndBlock);
+
+                    return builder->getInt32(0);
+                }
                 // Variable declaration & init: (var x (+ y 10))
                 // Typed: (var (x number) 42)
                 else if (op == "var")
